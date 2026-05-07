@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ChatUI } from "@/components/ChatUI";
 import { Sidebar } from "@/components/Sidebar";
 import { UploadZone } from "@/components/UploadZone";
+import { ProjectDatabaseSection } from "@/components/ProjectDatabaseSection";
 import { getProjectRecord, listUploadedFiles } from "@/lib/projects";
 
 type ProjectPageProps = {
@@ -57,29 +58,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
             <div className="space-y-4">
               <UploadZone projectId={project.id} initialFiles={files} />
 
-              <section className="rounded-[28px] border border-white/10 bg-white/3 p-5">
-                <p className="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">
-                  Connected databases
-                </p>
-                <div className="mt-4 space-y-3">
-                  {project.databases.map((database) => (
-                    <article
-                      key={database.name}
-                      className="rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-4"
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-semibold text-white">{database.name}</p>
-                          <p className="mt-1 text-sm text-slate-400">{database.engine}</p>
-                        </div>
-                        <span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2.5 py-1 text-[11px] font-medium text-emerald-300">
-                          {database.status}
-                        </span>
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              </section>
+              <ProjectDatabaseSection projectId={project.id} />
 
               <section className="rounded-[28px] border border-white/10 bg-white/3 p-5">
                 <p className="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">

@@ -1,6 +1,9 @@
 import { getOpenAIClient, getOpenAIModel } from "@/lib/openai";
 import { describeRetrievedChunks } from "@/lib/rag/embed";
 import { retrieveRelevantChunks } from "@/lib/rag/retrieve";
+import { listUploadedFiles } from "@/lib/projects";
+import { getProjectDatabaseConnection } from "@/lib/db/connections";
+import { getProjectSchema, formatSchemaForAI } from "@/lib/db/schema";
 import type { QuestionMode } from "@/lib/rag/types";
 
 const MEDICAL_RESEARCH_SCHEMA = `
@@ -173,6 +176,34 @@ function buildMockRows(question: string) {
   ];
 }
 
+function normalizeRowValue(value: unknown): string | number | boolean | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    return value;
+  }
+
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+
+  return JSON.stringify(value);
+}
+
+function normalizeExecutionRows(rows: unknown[]) {
+  return rows.map((row) => {
+    if (!row || typeof row !== "object" || Array.isArray(row)) {
+      return { value: normalizeRowValue(row) };
+    }
+
+    return Object.fromEntries(
+      Object.entries(row as Record<string, unknown>).map(([key, value]) => [key, normalizeRowValue(value)]),
+    );
+  });
+}
+
 function buildFallbackSql(question: string) {
   const lowerQuestion = question.toLowerCase();
 
@@ -185,6 +216,77 @@ function buildFallbackSql(question: string) {
   }
 
   return `SELECT study_title, therapeutic_area, trial_phase, trial_status FROM studies ORDER BY started_at DESC LIMIT 5`;
+}
+
+async function executeSqlAgainstProjectDatabase(
+  dbConnection: NonNullable<Awaited<ReturnType<typeof getProjectDatabaseConnection>>>,
+  sql: string,
+): Promise<{
+  engine: "database" | "mock";
+  rowCount: number;
+  rows: Array<Record<string, string | number | boolean | null>>;
+  columns: string[];
+  error?: string;
+}> {
+  if (dbConnection.type === "postgres") {
+    const { Client } = await import("pg");
+    const client = new Client({
+      host: dbConnection.host,
+      port: dbConnection.port,
+      user: dbConnection.username,
+      password: dbConnection.password,
+      database: dbConnection.database,
+      ssl: dbConnection.ssl ? { rejectUnauthorized: false } : false,
+    });
+
+    try {
+      await client.connect();
+      const result = await client.query(sql);
+      const rows = normalizeExecutionRows(result.rows ?? []);
+
+      return {
+        engine: "database",
+        rowCount: typeof result.rowCount === "number" ? result.rowCount : rows.length,
+        rows,
+        columns: rows.length > 0 ? Object.keys(rows[0] ?? {}) : [],
+      };
+    } finally {
+      await client.end().catch(() => undefined);
+    }
+  }
+
+  if (dbConnection.type === "mysql") {
+    const mysql = await import("mysql2/promise");
+    const connection = await mysql.createConnection({
+      host: dbConnection.host,
+      port: dbConnection.port,
+      user: dbConnection.username,
+      password: dbConnection.password,
+      database: dbConnection.database,
+    });
+
+    try {
+      const [rows] = await connection.query(sql);
+      const normalizedRows = normalizeExecutionRows(Array.isArray(rows) ? rows : []);
+
+      return {
+        engine: "database",
+        rowCount: normalizedRows.length,
+        rows: normalizedRows,
+        columns: normalizedRows.length > 0 ? Object.keys(normalizedRows[0] ?? {}) : [],
+      };
+    } finally {
+      await connection.end().catch(() => undefined);
+    }
+  }
+
+  return {
+    engine: "mock",
+    rowCount: 0,
+    rows: [],
+    columns: [],
+    error: `Live query execution is not implemented for ${dbConnection.type}. Connect a Postgres or MySQL database to run generated SQL.`,
+  };
 }
 
 function classifyQuestion(question: string): AskMode {
@@ -312,19 +414,52 @@ export async function POST(request: Request) {
       );
     }
 
-    const schema =
-      typeof body.schema === "string" && body.schema.trim()
-        ? body.schema.trim()
-        : MEDICAL_RESEARCH_SCHEMA;
-
     const projectId = typeof body.projectId === "string" && body.projectId.trim() ? body.projectId.trim() : "default";
-    const mode = classifyQuestion(question);
+    
+    // Resolve project data sources
+    const uploadedFiles = await listUploadedFiles(projectId);
+    
+    // Check for actual database connection (not just project.databases)
+    const dbConnection = await getProjectDatabaseConnection(projectId);
+    const hasDatabase = dbConnection !== null;
+    const hasDocuments = Array.isArray(uploadedFiles) && uploadedFiles.length > 0;
+
+    // Load schema from project connection or use provided schema
+    let schema: string;
+    if (hasDatabase && dbConnection) {
+      const cachedSchema = await getProjectSchema(projectId);
+      schema = cachedSchema ? formatSchemaForAI(cachedSchema) : MEDICAL_RESEARCH_SCHEMA;
+    } else if (typeof body.schema === "string" && body.schema.trim()) {
+      schema = body.schema.trim();
+    } else {
+      schema = MEDICAL_RESEARCH_SCHEMA;
+    }
+
+    let mode = classifyQuestion(question);
+
+    // Enforce routing rules per project sources
+    if (hasDocuments && !hasDatabase) {
+      // Only use RAG retrieval when there are documents and no DB
+      mode = { mode: "rag", sql: false, rag: true };
+    } else if (hasDatabase && !hasDocuments) {
+      // Only use SQL flow when database exists and no documents
+      mode = { mode: "sql", sql: true, rag: false };
+    } else if (hasDatabase && hasDocuments) {
+      // When both exist, prefer hybrid
+      mode = { mode: "hybrid", sql: true, rag: true };
+    }
 
     let candidate: SqlCandidate | null = null;
     let sql: string | undefined;
     let validation = { passed: true, reason: null as string | null };
+    let execution = {
+      engine: "mock" as const,
+      rowCount: 0,
+      rows: [] as Array<Record<string, string | number | boolean | null>>,
+      columns: [] as string[],
+    };
 
-    if (mode.sql) {
+    if (mode.sql && hasDatabase) {
       candidate = await generateSql(question, schema);
       sql = normalizeSql(candidate.sql);
       validation = validateSelectOnly(sql);
@@ -339,6 +474,28 @@ export async function POST(request: Request) {
           { status: 400 },
         );
       }
+
+      execution = await executeSqlAgainstProjectDatabase(dbConnection, sql);
+
+      if (execution.error) {
+        return Response.json(
+          {
+            error: execution.error,
+            sql,
+            provider: candidate.provider,
+            execution,
+          },
+          { status: 400 },
+        );
+      }
+    } else if (mode.sql) {
+      const fallbackRows = buildMockRows(question);
+      execution = {
+        engine: "mock",
+        rowCount: fallbackRows.length,
+        rows: normalizeExecutionRows(fallbackRows),
+        columns: fallbackRows.length > 0 ? Object.keys(fallbackRows[0] ?? {}) : [],
+      };
     }
 
     const retrieval = mode.rag
@@ -357,19 +514,22 @@ export async function POST(request: Request) {
       mode: mode.mode,
     });
 
-    const rows = mode.sql ? buildMockRows(question) : [];
-    const columns = rows.length > 0 ? Object.keys(rows[0] ?? {}) : [];
+    const rows = mode.sql ? execution.rows : [];
+    const columns = mode.sql ? execution.columns : [];
 
     return Response.json({
       question,
       projectId,
+      hasDatabase,
+      hasDocuments,
       mode: mode.mode,
       sql,
       provider: candidate?.provider ?? answer.provider,
       message: answer.answer || candidate?.summary || "The request was processed successfully.",
       validation,
+      execution,
       mockResponse: {
-        rowCount: rows.length,
+        rowCount: execution.rowCount,
         columns,
         rows,
       },

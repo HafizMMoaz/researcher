@@ -9,6 +9,8 @@ export type ProjectRecord = {
   description: string;
   databases: Array<{ name: string; engine: string; status: string }>;
   dashboardUrl: string;
+  hasDatabase?: boolean;
+  hasDocuments?: boolean;
 };
 
 const DEFAULT_DASHBOARD_URL =
@@ -25,6 +27,8 @@ const demoProjects: Record<string, ProjectRecord> = {
       { name: "metabase", engine: "Embedded BI", status: "Synced" },
     ],
     dashboardUrl: DEFAULT_DASHBOARD_URL,
+    hasDatabase: true,
+    hasDocuments: false,
   },
 };
 
@@ -49,6 +53,8 @@ export function getProjectRecord(projectId: string): ProjectRecord {
         { name: "metabase", engine: "Embedded BI", status: "Synced" },
       ],
       dashboardUrl: DEFAULT_DASHBOARD_URL,
+      hasDatabase: true,
+      hasDocuments: false,
     }
   );
 }

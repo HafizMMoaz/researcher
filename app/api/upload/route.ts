@@ -107,17 +107,25 @@ export async function POST(request: Request) {
           mimeType: uploadRecord.mimeType,
         });
 
-        const embeddingResult = await embedDocumentChunks({
-          projectId,
-          chunks: parsed.chunks,
-        });
+        if (parsed.chunks.length === 0) {
+          uploadRecord.status = "error";
+          uploadRecord.error = 
+            "No text extracted from document. This PDF may contain only images or have restricted text extraction. " +
+            "Try: 1) Converting to a searchable PDF with OCR, 2) Using a text-based document instead, " +
+            "or 3) Implementing Unstructured.io integration for better PDF support.";
+        } else {
+          const embeddingResult = await embedDocumentChunks({
+            projectId,
+            chunks: parsed.chunks,
+          });
 
-        uploadRecord.kind = parsed.kind;
-        uploadRecord.chunkCount = embeddingResult.chunkCount;
-        uploadRecord.status = embeddingResult.indexed ? "indexed" : "processing";
+          uploadRecord.kind = parsed.kind;
+          uploadRecord.chunkCount = embeddingResult.chunkCount;
+          uploadRecord.status = embeddingResult.indexed ? "indexed" : "processing";
 
-        if ("reason" in embeddingResult && embeddingResult.reason) {
-          uploadRecord.error = embeddingResult.reason;
+          if ("reason" in embeddingResult && embeddingResult.reason) {
+            uploadRecord.error = embeddingResult.reason;
+          }
         }
       } catch (processingError) {
         uploadRecord.status = "error";

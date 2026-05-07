@@ -4,7 +4,7 @@ import { Sidebar } from "@/components/Sidebar";
 
 const dashboardUrl =
   process.env.NEXT_PUBLIC_METABASE_DASHBOARD_URL ??
-  "http://localhost:3001/dashboard/1?date_grouping=&date_range=&product_category=Doohickey&product_category=Gizmo&product_category=Gadget&product_category=Widget&tab=1-overview&vendor=";
+  "http://localhost:3001/public/dashboard/1?date_grouping=&date_range=&product_category=Doohickey&product_category=Gizmo&product_category=Gadget&product_category=Widget&tab=1-overview&vendor=";
 
 export const metadata = {
   title: "Dashboard | Medical Research Intelligence Platform",

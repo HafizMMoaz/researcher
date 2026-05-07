@@ -11,6 +11,13 @@ type AskResponse = {
   sql: string;
   provider: "openai" | "mock";
   message: string;
+  execution?: {
+    engine: "database" | "mock";
+    rowCount: number;
+    columns: string[];
+    rows: QueryRow[];
+    error?: string;
+  };
   validation: {
     passed: boolean;
     reason: string | null;
@@ -48,6 +55,7 @@ type ChatMessage = {
   columns?: string[];
   status?: string;
   provider?: string;
+  executionEngine?: "database" | "mock";
   mode?: "sql" | "rag" | "hybrid";
   context?: string;
   sources?: Array<{
@@ -148,19 +156,22 @@ export function ChatUI({
         role: "assistant",
         content: data.message ?? "Your request was processed successfully.",
         sql: data.sql,
-        rows: mockResponse.rows,
-        columns: mockResponse.columns.length
-          ? mockResponse.columns
-          : createMockColumns(mockResponse.rows),
+        rows: data.execution?.rows ?? mockResponse.rows,
+        columns: data.execution?.columns.length
+          ? data.execution.columns
+          : mockResponse.columns.length
+            ? mockResponse.columns
+            : createMockColumns(mockResponse.rows),
         status:
           data.mode === "rag"
             ? "Document retrieval"
             : data.mode === "hybrid"
               ? "SQL + document context"
-              : data.provider === "mock"
-                ? "Mock execution"
-                : "OpenAI generated",
+              : data.execution?.engine === "database"
+                ? "Live database query"
+                : "Query preview",
         provider: data.provider,
+        executionEngine: data.execution?.engine,
         mode: data.mode,
         context: data.rag?.context,
         sources: data.rag?.chunks,
@@ -232,7 +243,7 @@ export function ChatUI({
                     {message.content}
                   </p>
 
-                  {message.context ? (
+                  {message.context && message.mode === "rag" ? (
                     <div className="mt-4 rounded-2xl border border-cyan-400/15 bg-cyan-400/8 px-4 py-4 text-sm leading-7 text-cyan-50/90">
                       <p className="text-xs font-semibold uppercase tracking-[0.35em] text-cyan-200/80">
                         Retrieved context
@@ -260,7 +271,7 @@ export function ChatUI({
                   {message.rows?.length ? (
                     <div className="mt-4 overflow-hidden rounded-2xl border border-white/10">
                       <div className="border-b border-white/10 bg-white/3 px-4 py-3 text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">
-                        Mock result set
+                        {message.executionEngine === "database" ? "Live result set" : "Query preview"}
                       </div>
                       <div className="overflow-x-auto">
                         <table className="min-w-full text-left text-sm">
@@ -289,7 +300,7 @@ export function ChatUI({
                     </div>
                   ) : null}
 
-                  {message.sources?.length ? (
+                  {message.sources?.length && message.mode === "rag" ? (
                     <div className="mt-4 space-y-3">
                       <p className="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">
                         Top matches
@@ -414,9 +425,9 @@ export function ChatUI({
                 Ready for scale
               </p>
               <p className="mt-3 text-sm leading-7 text-slate-300">
-                The result payload already carries SQL, provider metadata, and retrieval
-                context. That keeps the UI contract stable while the backend switches between
-                database and RAG workflows.
+                The result payload now carries SQL, provider metadata, retrieval context, and
+                live database rows when a project connection is configured. The Metabase page
+                stays focused on embedded BI, while generated queries execute through the API.
               </p>
             </div>
           </aside>

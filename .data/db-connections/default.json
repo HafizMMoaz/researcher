@@ -1,0 +1,16 @@
+{
+  "id": "default-1778142380301",
+  "projectId": "default",
+  "type": "postgres",
+  "host": "localhost",
+  "port": 5432,
+  "username": "postgres",
+  "password": "Hafiz...1452",
+  "database": "testmedicaldb",
+  "ssl": false,
+  "createdAt": "2026-05-07T08:26:20.301Z",
+  "testResult": {
+    "success": true,
+    "tables": 0
+  }
+}

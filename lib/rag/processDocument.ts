@@ -2,9 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 import mammoth from "mammoth";
-import { UnstructuredClient } from "unstructured-client";
-import type { StrategyOpen } from "unstructured-client/sdk/models/shared";
-import type { DocumentChunk, RagFileKind } from "./types";
+import type { RagFileKind } from "./types";
 
 type ProcessDocumentInput = {
   filePath: string;
@@ -12,16 +10,6 @@ type ProcessDocumentInput = {
   projectId: string;
   documentId: string;
   mimeType: string;
-};
-
-type ParsedElement = {
-  text?: string;
-  metadata?: {
-    page_number?: number;
-    pageNumber?: number;
-    section_title?: string;
-    sectionTitle?: string;
-  };
 };
 
 const MAX_CHUNK_CHARS = 1200;
@@ -124,47 +112,13 @@ function buildChunksFromText({
   }));
 }
 
-async function parseWithUnstructured(filePath: string, fileName: string) {
-  const apiKey = process.env.UNSTRUCTURED_API_KEY;
+// Unstructured cloud parsing removed for MVP; use local parsers (pdf-parse, mammoth, CSV) instead.
 
-  if (!apiKey) {
-    return null;
-  }
-
-  const client = new UnstructuredClient({
-    serverURL: process.env.UNSTRUCTURED_URL ?? "https://api.unstructured.io",
-    security: { apiKeyAuth: apiKey },
-  });
-
-  const buffer = await fs.readFile(filePath);
-  const response = await client.general.partition({
-    partitionParameters: {
-      files: {
-        content: buffer,
-        fileName,
-      },
-      strategy: "hi_res" as StrategyOpen,
-      chunkingStrategy: "by_title",
-      includeOrigElements: true,
-      uniqueElementIds: true,
-    },
-  });
-
-  if (typeof response === "string") {
-    try {
-      return JSON.parse(response) as ParsedElement[];
-    } catch {
-      return [{ text: response }];
-    }
-  }
-
-  return response as ParsedElement[];
-}
 
 async function parsePdf(filePath: string) {
   const buffer = await fs.readFile(filePath);
   const pdfModule = await import("pdf-parse");
-  type PdfFn = (data: Buffer) => Promise<{ text: string }>;
+  type PdfFn = (data: Buffer, options?: { max: number }) => Promise<{ text: string; pages?: number }>;
   const modUnknown = pdfModule as unknown;
   let pdfFn: PdfFn;
 
@@ -180,8 +134,25 @@ async function parsePdf(filePath: string) {
     throw new Error("Unable to resolve pdf-parse function from dynamic import");
   }
 
-  const parsed = await pdfFn(buffer as Buffer);
-  return normalizeText(parsed.text);
+  try {
+    // Try to parse with a max page limit to avoid timeouts on large PDFs
+    const parsed = await pdfFn(buffer as Buffer, { max: 50 });
+    const text = normalizeText(parsed.text);
+    
+    // If no text was extracted, throw an error with helpful message
+    if (!text || text.length < 50) {
+      throw new Error(
+        `PDF text extraction returned insufficient text (${text?.length ?? 0} chars). ` +
+        `This PDF may contain scanned images or have restricted text extraction. ` +
+        `Consider using OCR or Unstructured.io for better support.`
+      );
+    }
+    
+    return text;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown PDF parsing error";
+    throw new Error(`Failed to parse PDF: ${message}`);
+  }
 }
 
 async function parseDocx(filePath: string) {
@@ -202,71 +173,10 @@ async function parseCsv(filePath: string) {
   return normalizeText([`Headers: ${header}`, ...values].join("\n"));
 }
 
-function convertParsedElementsToChunks({
-  elements,
-  projectId,
-  documentId,
-  filePath,
-  fileName,
-  mimeType,
-  kind,
-}: {
-  elements: ParsedElement[];
-  projectId: string;
-  documentId: string;
-  filePath: string;
-  fileName: string;
-  mimeType: string;
-  kind: RagFileKind;
-}) {
-  const chunks: DocumentChunk[] = [];
-
-  elements.forEach((element, index) => {
-    const text = normalizeText(element.text ?? "");
-
-    if (!text) {
-      return;
-    }
-
-    chunks.push({
-      id: `${documentId}-chunk-${index + 1}`,
-      text,
-      metadata: {
-        projectId,
-        documentId,
-        fileName,
-        filePath,
-        mimeType,
-        kind,
-        chunkIndex: index,
-        pageNumber: element.metadata?.page_number ?? element.metadata?.pageNumber,
-        sectionTitle: element.metadata?.section_title ?? element.metadata?.sectionTitle,
-      },
-    });
-  });
-
-  return chunks;
-}
-
 export async function processDocument(input: ProcessDocumentInput) {
   const kind = getFileKind(input.fileName, input.mimeType);
-  const parsedElements = await parseWithUnstructured(input.filePath, input.fileName);
 
-  if (parsedElements && parsedElements.length > 0) {
-    return {
-      kind,
-      chunks: convertParsedElementsToChunks({
-        elements: parsedElements,
-        projectId: input.projectId,
-        documentId: input.documentId,
-        filePath: input.filePath,
-        fileName: input.fileName,
-        mimeType: input.mimeType,
-        kind,
-      }),
-    };
-  }
-
+  // Use only local parsing for PDFs, DOCX, CSV, and plain text.
   let rawText = "";
 
   if (kind === "pdf") {
