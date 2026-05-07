@@ -452,8 +452,14 @@ export async function POST(request: Request) {
     let candidate: SqlCandidate | null = null;
     let sql: string | undefined;
     let validation = { passed: true, reason: null as string | null };
-    let execution = {
-      engine: "mock" as const,
+    let execution: {
+      engine: "database" | "mock";
+      rowCount: number;
+      rows: Array<Record<string, string | number | boolean | null>>;
+      columns: string[];
+      error?: string;
+    } = {
+      engine: "mock",
       rowCount: 0,
       rows: [] as Array<Record<string, string | number | boolean | null>>,
       columns: [] as string[],
