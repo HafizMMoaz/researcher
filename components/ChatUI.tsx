@@ -101,8 +101,7 @@ export function ChatUI({
     {
       id: "assistant-welcome",
       role: "assistant",
-      content:
-        `Ask a question about ${projectName}. I will route SQL questions to the database flow, document questions to RAG retrieval, and hybrid questions to both.`,
+      content: `Ask a question about ${projectName}. I will route SQL questions to the database flow, document questions to RAG retrieval, and hybrid questions to both.`,
       status: "Ready",
     },
   ]);
@@ -196,45 +195,45 @@ export function ChatUI({
   }
 
   return (
-    <div className="flex min-h-screen flex-1 flex-col px-4 py-4 md:px-6 md:py-6">
-      <div className="flex flex-1 flex-col rounded-4xl border border-white/10 bg-slate-950/65 shadow-[0_30px_120px_rgba(0,0,0,0.4)] backdrop-blur-xl">
-        <header className="border-b border-white/10 px-5 py-5 md:px-7">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.35em] text-cyan-300/80">
-                Project workspace
-              </p>
-              <h1 className="mt-2 text-2xl font-semibold text-white md:text-3xl">
-                Chat with SQL, uploaded documents, or both.
-              </h1>
-              <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-400 md:text-base">
-                The API inspects your question, routes it to SQL generation or RAG retrieval,
-                and returns a single unified answer payload for the UI.
+    <div className="flex min-h-[calc(100vh-2rem)] flex-1 flex-col px-0 py-0 md:px-0 md:py-0">
+      <div className="surface-panel flex flex-1 flex-col overflow-hidden">
+        <header className="border-b border-(--hairline) px-5 py-5 md:px-7">
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto]">
+            <div className="min-w-0">
+              <p className="kicker">Project workspace</p>
+              <h1 className="display-md mt-2">Chat with SQL, uploaded documents, or both.</h1>
+              <p className="body-copy mt-2 max-w-3xl">
+                The API inspects your question, routes it to SQL generation or RAG retrieval, and
+                returns a single unified answer payload for the UI.
               </p>
             </div>
 
-            <div className="rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 text-right">
-              <p className="text-xs uppercase tracking-[0.3em] text-emerald-300/80">Status</p>
-              <p className="mt-1 text-sm font-medium text-emerald-200">
+            <div className="surface-canvas px-4 py-3 text-right">
+              <p className="kicker">Status</p>
+              <p className="mt-1 text-sm font-medium text-(--body-strong)">
                 {isSubmitting ? "Thinking..." : "Ready for questions"}
               </p>
             </div>
           </div>
         </header>
 
-        <div className="grid flex-1 gap-4 px-4 py-4 md:grid-cols-[1fr_320px] md:px-6 md:py-6">
-          <section className="flex min-h-[60vh] flex-col rounded-[28px] border border-white/10 bg-white/3">
+        <div className="grid flex-1 gap-4 px-4 py-4 xl:grid-cols-[minmax(0,1fr)_300px] md:px-6 md:py-6">
+          <section className="surface-canvas flex min-h-[60vh] flex-col overflow-hidden">
             <div className="flex-1 space-y-4 overflow-y-auto p-4 md:p-6">
               {messages.map((message) => (
                 <article
                   key={message.id}
-                  className={`rounded-[26px] border p-4 md:p-5 ${
+                  className={`min-w-0 rounded-xl border p-4 md:p-5 ${
                     message.role === "user"
-                      ? "ml-auto max-w-[85%] border-cyan-400/20 bg-cyan-400/10 text-cyan-50"
-                      : "mr-auto max-w-[96%] border-white/10 bg-slate-900/70 text-slate-100"
+                      ? "ml-auto max-w-full border-(--primary) bg-(--primary) text-white sm:max-w-[85%]"
+                      : "mr-auto max-w-full border-(--hairline) bg-(--surface-card) text-(--ink) sm:max-w-[96%]"
                   }`}
                 >
-                  <div className="flex items-center justify-between gap-3 text-xs uppercase tracking-[0.3em] text-slate-400">
+                  <div
+                    className={`flex flex-wrap items-center justify-between gap-2 text-xs uppercase ${
+                      message.role === "user" ? "text-white/80" : "text-(--muted)"
+                    }`}
+                  >
                     <span>{message.role === "user" ? "You" : "Assistant"}</span>
                     {message.status ? <span>{message.status}</span> : null}
                   </div>
@@ -253,42 +252,38 @@ export function ChatUI({
                   ) : null}
 
                   {message.sql ? (
-                    <div className="mt-4 rounded-2xl border border-white/10 bg-slate-950 px-4 py-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <p className="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">
-                          Generated SQL
-                        </p>
-                        <span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2.5 py-1 text-[11px] font-medium text-emerald-300">
-                          {message.provider}
-                        </span>
+                    <div className="surface-dark mt-4 p-4">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <p className="kicker text-(--on-dark-soft)">Generated SQL</p>
+                        <span className="badge-status">{message.provider}</span>
                       </div>
-                      <pre className="mt-3 overflow-x-auto text-sm leading-7 text-cyan-200">
+                      <pre className="code-block mt-3 p-4">
                         <code>{message.sql}</code>
                       </pre>
                     </div>
                   ) : null}
 
                   {message.rows?.length ? (
-                    <div className="mt-4 overflow-hidden rounded-2xl border border-white/10">
-                      <div className="border-b border-white/10 bg-white/3 px-4 py-3 text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">
+                    <div className="mt-4 overflow-hidden rounded-lg border border-(--hairline)">
+                      <div className="border-b border-(--hairline) bg-(--canvas) px-4 py-3 text-xs font-semibold uppercase text-(--muted)">
                         {message.executionEngine === "database" ? "Live result set" : "Query preview"}
                       </div>
                       <div className="overflow-x-auto">
                         <table className="min-w-full text-left text-sm">
-                          <thead className="bg-slate-950/80 text-slate-300">
+                          <thead className="bg-(--surface-soft) text-(--body-strong)">
                             <tr>
                               {(message.columns ?? Object.keys(message.rows[0] ?? {})).map((column) => (
-                                <th key={column} className="px-4 py-3 font-medium">
+                                <th key={column} className="min-w-32 px-4 py-3 font-medium">
                                   {column}
                                 </th>
                               ))}
                             </tr>
                           </thead>
-                          <tbody className="divide-y divide-white/10 bg-slate-950/60 text-slate-200">
+                          <tbody className="divide-y divide-(--hairline) bg-(--canvas) text-(--body)">
                             {message.rows.map((row, rowIndex) => (
                               <tr key={`${message.id}-${rowIndex}`}>
                                 {(message.columns ?? Object.keys(row)).map((column) => (
-                                  <td key={column} className="px-4 py-3 align-top text-slate-300">
+                                  <td key={column} className="min-w-32 px-4 py-3 align-top">
                                     {String(row[column] ?? "-")}
                                   </td>
                                 ))}
@@ -302,21 +297,18 @@ export function ChatUI({
 
                   {message.sources?.length && message.mode === "rag" ? (
                     <div className="mt-4 space-y-3">
-                      <p className="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">
-                        Top matches
-                      </p>
+                      <p className="kicker">Top matches</p>
                       {message.sources.map((source) => (
-                        <div
-                          key={source.id}
-                          className="rounded-2xl border border-white/10 bg-white/3 px-4 py-4 text-sm text-slate-300"
-                        >
+                        <div key={source.id} className="surface-canvas px-4 py-4 text-sm">
                           <div className="flex flex-wrap items-center justify-between gap-3">
-                            <span className="font-medium text-white">{source.metadata.fileName}</span>
-                            <span className="text-xs uppercase tracking-[0.3em] text-slate-500">
+                            <span className="font-medium text-(--ink)">
+                              {source.metadata.fileName}
+                            </span>
+                            <span className="text-xs uppercase text-(--muted)">
                               score {source.score.toFixed(3)}
                             </span>
                           </div>
-                          <p className="mt-2 whitespace-pre-wrap leading-7 text-slate-400">
+                          <p className="mt-2 whitespace-pre-wrap leading-7 text-(--muted)">
                             {source.text}
                           </p>
                         </div>
@@ -327,15 +319,15 @@ export function ChatUI({
               ))}
 
               {isSubmitting ? (
-                <div className="max-w-[96%] rounded-[26px] border border-white/10 bg-slate-900/70 p-4 md:p-5">
-                  <div className="flex items-center gap-3 text-sm text-slate-300">
-                    <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-cyan-300" />
+                <div className="mr-auto max-w-[96%] rounded-xl border border-(--hairline) bg-(--surface-card) p-4 md:p-5">
+                  <div className="flex items-center gap-3 text-sm text-(--body)">
+                    <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-(--primary)" />
                     Thinking, drafting SQL, and validating the query.
                   </div>
                   <div className="mt-4 space-y-2">
-                    <div className="h-3 w-2/3 animate-pulse rounded-full bg-white/10" />
-                    <div className="h-3 w-1/2 animate-pulse rounded-full bg-white/10" />
-                    <div className="h-3 w-5/6 animate-pulse rounded-full bg-white/10" />
+                    <div className="h-3 w-2/3 animate-pulse rounded-full bg-(--primary-disabled)" />
+                    <div className="h-3 w-1/2 animate-pulse rounded-full bg-(--primary-disabled)" />
+                    <div className="h-3 w-5/6 animate-pulse rounded-full bg-(--primary-disabled)" />
                   </div>
                 </div>
               ) : null}
@@ -344,13 +336,13 @@ export function ChatUI({
             </div>
 
             <form
-              className="border-t border-white/10 p-4 md:p-6"
+              className="border-t border-(--hairline) p-4 md:p-6"
               onSubmit={(event) => {
                 event.preventDefault();
                 void submitQuestion(draft);
               }}
             >
-              <div className="rounded-[28px] border border-white/10 bg-slate-950/90 p-3 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]">
+              <div className="surface-card p-3">
                 <textarea
                   value={draft}
                   onChange={(event) => setDraft(event.target.value)}
@@ -361,34 +353,30 @@ export function ChatUI({
                     }
                   }}
                   placeholder="Ask about uploaded documents, the database, or both..."
-                  className="min-h-24 w-full resize-none rounded-[22px] border border-white/10 bg-transparent px-4 py-4 text-sm leading-7 text-white outline-none placeholder:text-slate-500 focus:border-cyan-400/30"
+                  className="text-input min-h-24 w-full resize-none px-4 py-4 text-sm leading-7 placeholder:text-(--muted-soft)"
                 />
 
                 {error ? (
-                  <p className="mt-3 rounded-2xl border border-rose-400/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+                  <p className="mt-3 rounded-lg border border-(--error) bg-red-50 px-4 py-3 text-sm text-(--error)">
                     {error}
                   </p>
                 ) : null}
 
-                <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-                  <div className="flex flex-wrap gap-2">
+                <div className="mt-4 grid gap-3 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end">
+                  <div className="grid gap-2 sm:grid-cols-2 2xl:grid-cols-1">
                     {starterPrompts.map((prompt) => (
                       <button
                         key={prompt}
                         type="button"
                         onClick={() => setDraft(prompt)}
-                        className="rounded-full border border-white/10 bg-white/4 px-3 py-2 text-xs text-slate-300 transition hover:border-cyan-400/30 hover:bg-cyan-400/10 hover:text-white"
+                        className="min-h-10 rounded-lg border border-(--hairline) bg-(--canvas) px-3 py-2 text-left text-xs leading-5 text-(--muted) transition hover:bg-(--surface-soft) hover:text-(--ink)"
                       >
                         {prompt}
                       </button>
                     ))}
                   </div>
 
-                  <button
-                    type="submit"
-                    disabled={!canSubmit}
-                    className="inline-flex items-center justify-center rounded-full bg-linear-to-r from-cyan-400 to-blue-500 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
+                  <button type="submit" disabled={!canSubmit} className="btn-primary w-full xl:w-auto">
                     {isSubmitting ? "Generating..." : "Send question"}
                   </button>
                 </div>
@@ -396,38 +384,32 @@ export function ChatUI({
             </form>
           </section>
 
-          <aside className="space-y-4">
-            <div className="rounded-[28px] border border-white/10 bg-white/3 p-5">
-              <p className="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">
-                Flow
-              </p>
-              <ol className="mt-4 space-y-4 text-sm text-slate-300">
-                <li className="rounded-2xl border border-white/10 bg-slate-950/70 p-4">
-                  1. User asks a research question in plain language.
-                </li>
-                <li className="rounded-2xl border border-white/10 bg-slate-950/70 p-4">
+          <aside className="space-y-4 xl:sticky xl:top-6 xl:self-start">
+            <div className="surface-canvas p-5">
+              <p className="kicker">Flow</p>
+              <ol className="mt-4 space-y-3 text-sm text-(--body)">
+                <li className="surface-card p-4">1. User asks a research question in plain language.</li>
+                <li className="surface-card p-4">
                   2. The router classifies the question as SQL, document, or hybrid.
                 </li>
-                <li className="rounded-2xl border border-white/10 bg-slate-950/70 p-4">
+                <li className="surface-card p-4">
                   3. SQL questions generate a safe read-only query.
                 </li>
-                <li className="rounded-2xl border border-white/10 bg-slate-950/70 p-4">
+                <li className="surface-card p-4">
                   4. Document questions use project-scoped retrieval from ChromaDB.
                 </li>
-                <li className="rounded-2xl border border-white/10 bg-slate-950/70 p-4">
+                <li className="surface-card p-4">
                   5. Hybrid questions combine both contexts into one answer.
                 </li>
               </ol>
             </div>
 
-            <div className="rounded-[28px] border border-white/10 bg-linear-to-br from-cyan-400/10 via-slate-900 to-slate-900 p-5">
-              <p className="text-xs font-semibold uppercase tracking-[0.35em] text-cyan-200/80">
-                Ready for scale
-              </p>
-              <p className="mt-3 text-sm leading-7 text-slate-300">
-                The result payload now carries SQL, provider metadata, retrieval context, and
-                live database rows when a project connection is configured. The Metabase page
-                stays focused on embedded BI, while generated queries execute through the API.
+            <div className="surface-dark p-5">
+              <p className="kicker text-(--on-dark-soft)">Ready for scale</p>
+              <p className="mt-3 text-sm leading-7 text-(--on-dark)">
+                The result payload already carries SQL, provider metadata, and retrieval context.
+                That keeps the UI contract stable while the backend switches between database and
+                RAG workflows.
               </p>
             </div>
           </aside>

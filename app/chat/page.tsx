@@ -8,9 +8,9 @@ export const metadata = {
 
 export default function ChatPage() {
   return (
-    <div className="min-h-screen bg-transparent text-slate-100 md:flex">
+    <div className="app-layout">
       <Sidebar />
-      <main className="flex-1">
+      <main className="flex-1 px-4 py-4 md:px-6 md:py-6">
         <ChatUI projectId="default" projectName="Medical Research Workspace" />
       </main>
     </div>
