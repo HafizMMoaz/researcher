@@ -234,15 +234,7 @@ export function Sidebar({ projects = defaultProjects }: { projects?: ProjectItem
             </div>
           </section>
 
-          <div className="surface-dark mt-8 p-5">
-            <p className="text-sm font-semibold text-[var(--on-dark)]">
-              Project-based architecture
-            </p>
-            <p className="mt-2 text-sm leading-6 text-[var(--on-dark-soft)]">
-              The same chat route can answer SQL, RAG, or hybrid questions while uploaded
-              documents stay local and indexed per project.
-            </p>
-          </div>
+          
         </>
       </div>
     </aside>

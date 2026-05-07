@@ -71,6 +71,28 @@ const starterPrompts = [
   "Find recent trials with the highest completion rate.",
 ];
 
+function HintIcon({ className = "" }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden="true"
+      className={className}
+      fill="none"
+      height="18"
+      viewBox="0 0 24 24"
+      width="18"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        d="M9 18h6M10 21h4M12 3a7 7 0 0 0-4 12.8V16h8v-.2A7 7 0 0 0 12 3Z"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+    </svg>
+  );
+}
+
 function createMockColumns(rows: QueryRow[]) {
   if (rows.length === 0) {
     return [] as string[];
@@ -89,6 +111,8 @@ export function ChatUI({
   const [draft, setDraft] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [toastError, setToastError] = useState<string | null>(null);
+  const [showHints, setShowHints] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: "assistant-welcome",
@@ -104,6 +128,18 @@ export function ChatUI({
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages, isSubmitting]);
 
+  useEffect(() => {
+    if (!toastError) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      setToastError(null);
+    }, 5200);
+
+    return () => window.clearTimeout(timer);
+  }, [toastError]);
+
   const canSubmit = useMemo(() => draft.trim().length > 0 && !isSubmitting, [draft, isSubmitting]);
 
   async function submitQuestion(question: string) {
@@ -115,6 +151,8 @@ export function ChatUI({
 
     setIsSubmitting(true);
     setError(null);
+    setToastError(null);
+    setShowHints(false);
 
     const userMessage: ChatMessage = {
       id: crypto.randomUUID(),
@@ -169,6 +207,7 @@ export function ChatUI({
     } catch (submitError) {
       const message = submitError instanceof Error ? submitError.message : "Unknown request error.";
       setError(message);
+      setToastError(message);
       setMessages((current) => [
         ...current,
         {
@@ -184,10 +223,36 @@ export function ChatUI({
   }
 
   return (
-    <div className="flex min-h-[calc(100vh-2rem)] flex-1 flex-col px-0 py-0 md:px-0 md:py-0">
-      <div className="surface-panel flex flex-1 flex-col overflow-hidden">
+    <div className="flex min-h-[130vh] flex-1 flex-col px-0 py-0 md:h-[90vh] md:px-0 md:py-0">
+      {toastError ? (
+        <div className="pointer-events-none fixed bottom-5 right-5 z-50 w-[min(420px,calc(100vw-2.5rem))]">
+          <div
+            className="pointer-events-auto flex items-start gap-3 rounded-xl border border-[var(--error)] bg-white/95 px-4 py-4 text-sm text-[var(--ink)] shadow-lg backdrop-blur"
+            role="status"
+            aria-live="polite"
+          >
+            <span className="mt-0.5 h-2.5 w-2.5 shrink-0 rounded-full bg-[var(--error)]" />
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--muted)]">
+                Error
+              </p>
+              <p className="mt-1 break-words text-[var(--ink)]">{toastError}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setToastError(null)}
+              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--hairline)] bg-[var(--canvas)] text-[var(--muted)] transition hover:bg-[var(--surface-soft)] hover:text-[var(--ink)]"
+              aria-label="Dismiss error notification"
+              title="Dismiss"
+            >
+              <span aria-hidden="true">×</span>
+            </button>
+          </div>
+        </div>
+      ) : null}
+      <div className="surface-panel flex min-h-0 flex-1 flex-col overflow-hidden">
         <header className="border-b border-[var(--hairline)] px-5 py-5 md:px-7">
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto]">
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
             <div className="min-w-0">
               <p className="kicker">Project workspace</p>
               <h1 className="display-md mt-2">Chat with SQL, uploaded documents, or both.</h1>
@@ -197,18 +262,18 @@ export function ChatUI({
               </p>
             </div>
 
-            <div className="surface-canvas px-4 py-3 text-right">
-              <p className="kicker">Status</p>
-              <p className="mt-1 text-sm font-medium text-[var(--body-strong)]">
-                {isSubmitting ? "Thinking..." : "Ready for questions"}
-              </p>
+            <div className="surface-canvas inline-flex items-center gap-2 self-start px-3 py-2 text-right">
+              <span className="h-2.5 w-2.5 rounded-full bg-[var(--primary)]" />
+              <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--muted)]">
+                {isSubmitting ? "Thinking" : "Ready"}
+              </span>
             </div>
           </div>
         </header>
 
-        <div className="grid flex-1 gap-4 px-4 py-4 xl:grid-cols-[minmax(0,1fr)_300px] md:px-6 md:py-6">
-          <section className="surface-canvas flex min-h-[60vh] flex-col overflow-hidden">
-            <div className="flex-1 space-y-4 overflow-y-auto p-4 md:p-6">
+        <div className="grid min-h-0 flex-1 gap-4 px-4 py-4 xl:grid-cols-[minmax(0,1fr)_300px] md:px-6 md:py-6">
+          <section className="surface-canvas flex min-h-0 flex-col overflow-hidden">
+            <div className="flex-1 min-h-0 space-y-4 overflow-y-auto p-4 md:p-6">
               {messages.map((message) => (
                 <article
                   key={message.id}
@@ -323,7 +388,7 @@ export function ChatUI({
             </div>
 
             <form
-              className="border-t border-[var(--hairline)] p-4 md:p-6"
+              className="shrink-0 border-t border-[var(--hairline)] p-4 md:p-6"
               onSubmit={(event) => {
                 event.preventDefault();
                 void submitQuestion(draft);
@@ -343,27 +408,40 @@ export function ChatUI({
                   className="text-input min-h-24 w-full resize-none px-4 py-4 text-sm leading-7 placeholder:text-[var(--muted-soft)]"
                 />
 
-                {error ? (
-                  <p className="mt-3 rounded-lg border border-[var(--error)] bg-red-50 px-4 py-3 text-sm text-[var(--error)]">
-                    {error}
-                  </p>
-                ) : null}
-
-                <div className="mt-4 grid gap-3 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end">
-                  <div className="grid gap-2 sm:grid-cols-2 2xl:grid-cols-1">
+                {showHints ? (
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
                     {starterPrompts.map((prompt) => (
                       <button
                         key={prompt}
                         type="button"
-                        onClick={() => setDraft(prompt)}
+                        onClick={() => {
+                          setDraft(prompt);
+                          setShowHints(false);
+                        }}
                         className="min-h-10 rounded-lg border border-[var(--hairline)] bg-[var(--canvas)] px-3 py-2 text-left text-xs leading-5 text-[var(--muted)] transition hover:bg-[var(--surface-soft)] hover:text-[var(--ink)]"
                       >
                         {prompt}
                       </button>
                     ))}
                   </div>
+                ) : null}
 
-                  <button type="submit" disabled={!canSubmit} className="btn-primary w-full xl:w-auto">
+                <div className="mt-4 flex items-center justify-between gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowHints((current) => !current)}
+                    className={`inline-flex h-10 w-10 items-center justify-center rounded-lg border transition ${
+                      showHints
+                        ? "border-[var(--primary)] bg-[var(--surface-card)] text-[var(--ink)]"
+                        : "border-[var(--hairline)] bg-[var(--canvas)] text-[var(--muted)] hover:bg-[var(--surface-soft)] hover:text-[var(--ink)]"
+                    }`}
+                    aria-label="Show suggested questions"
+                    title="Show suggested questions"
+                  >
+                    <HintIcon />
+                  </button>
+
+                  <button type="submit" disabled={!canSubmit} className="btn-primary ml-auto w-auto">
                     {isSubmitting ? "Generating..." : "Send question"}
                   </button>
                 </div>
@@ -371,7 +449,7 @@ export function ChatUI({
             </form>
           </section>
 
-          <aside className="space-y-4 xl:sticky xl:top-6 xl:self-start">
+          <aside className="min-h-0 space-y-4 xl:sticky xl:top-6 xl:max-h-full xl:self-start xl:overflow-y-auto xl:[scrollbar-gutter:stable]">
             <div className="surface-canvas p-5">
               <p className="kicker">Flow</p>
               <ol className="mt-4 space-y-3 text-sm text-[var(--body)]">
